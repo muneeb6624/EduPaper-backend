@@ -1,6 +1,7 @@
-const Attempt = require('../models/Attempt');
-const Paper = require('../models/Paper');
-const User = require('../models/User');
+const Attempt = require("../models/Attempt");
+const Paper = require("../models/Paper");
+const User = require("../models/User");
+const Result = require("../models/Result");
 
 class AttemptController {
   // Start an attempt
@@ -10,33 +11,48 @@ class AttemptController {
       const studentId = req.user._id;
 
       const paper = await Paper.findById(paperId);
-      if (!paper) return res.status(404).json({ success: false, message: 'Paper not found' });
+      if (!paper)
+        return res
+          .status(404)
+          .json({ success: false, message: "Paper not found" });
 
       // Check if student is assigned
-      if (!paper.assignedTo.some(id => id.equals(studentId))) {
-        return res.status(403).json({ success: false, message: 'You are not assigned to this paper' });
+      if (!paper.assignedTo.some((id) => id.equals(studentId))) {
+        return res
+          .status(403)
+          .json({
+            success: false,
+            message: "You are not assigned to this paper",
+          });
       }
 
       // Check time window
       const now = new Date();
       if (now < paper.settings.startTime || now > paper.settings.endTime) {
-        return res.status(400).json({ success: false, message: 'Paper is not active at this time' });
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message: "Paper is not active at this time",
+          });
       }
 
       // Count previous attempts
       const attemptCount = await Attempt.countDocuments({ paperId, studentId });
       if (attemptCount >= paper.settings.maxAttempts) {
-        return res.status(400).json({ success: false, message: 'Maximum attempts reached' });
+        return res
+          .status(400)
+          .json({ success: false, message: "Maximum attempts reached" });
       }
 
       // Create new attempt
-      const answers = paper.questions.map(q => ({
+      const answers = paper.questions.map((q) => ({
         questionId: q._id,
         questionType: q.type,
         maxMarks: q.marks,
-        answer: '',
+        answer: "",
         isCorrect: null,
-        marksObtained: 0
+        marksObtained: 0,
       }));
 
       const attempt = await Attempt.create({
@@ -44,14 +60,20 @@ class AttemptController {
         studentId,
         attemptNumber: attemptCount + 1,
         answers,
-        status: 'in_progress',
-        scoring: { totalMarks: paper.settings.totalMarks }
+        status: "in_progress",
+        scoring: { totalMarks: paper.settings.totalMarks },
       });
 
       res.status(201).json({ success: true, attempt });
     } catch (error) {
-      console.error('Start attempt error:', error);
-      res.status(400).json({ success: false, message: 'Error starting attempt', error: error.message });
+      console.error("Start attempt error:", error);
+      res
+        .status(400)
+        .json({
+          success: false,
+          message: "Error starting attempt",
+          error: error.message,
+        });
     }
   }
 
@@ -62,19 +84,31 @@ class AttemptController {
       const studentId = req.user._id;
       const { answers: submittedAnswers } = req.body;
 
-      const attempt = await Attempt.findOne({ paperId, studentId, status: 'in_progress' });
-      if (!attempt) return res.status(404).json({ success: false, message: 'No in-progress attempt found' });
+      const attempt = await Attempt.findOne({
+        paperId,
+        studentId,
+        status: "in_progress",
+      });
+      if (!attempt)
+        return res
+          .status(404)
+          .json({ success: false, message: "No in-progress attempt found" });
 
       const paper = await Paper.findById(paperId);
-      if (!paper) return res.status(404).json({ success: false, message: 'Paper not found' });
+      if (!paper)
+        return res
+          .status(404)
+          .json({ success: false, message: "Paper not found" });
 
       // Map submitted answers
-      attempt.answers.forEach(ans => {
-        const submitted = submittedAnswers.find(a => a.questionId === ans.questionId.toString());
+      attempt.answers.forEach((ans) => {
+        const submitted = submittedAnswers.find(
+          (a) => a.questionId === ans.questionId.toString()
+        );
         if (submitted) {
-          ans.answer = submitted.answer || '';
+          ans.answer = submitted.answer || "";
           // Auto-grade MCQs
-          if (ans.questionType === 'mcq') {
+          if (ans.questionType === "mcq") {
             const question = paper.questions.id(ans.questionId);
             if (question) {
               ans.isCorrect = submitted.answer === question.correctAnswer;
@@ -87,65 +121,126 @@ class AttemptController {
       });
 
       // Compute scoring
-      const obtainedMarks = attempt.answers.reduce((sum, a) => sum + (a.marksObtained || 0), 0);
+      const obtainedMarks = attempt.answers.reduce(
+        (sum, a) => sum + (a.marksObtained || 0),
+        0
+      );
       const totalMarks = paper.settings.totalMarks;
       const percentage = ((obtainedMarks / totalMarks) * 100).toFixed(2);
       attempt.scoring.obtainedMarks = obtainedMarks;
       attempt.scoring.percentage = Number(percentage);
-      attempt.scoring.isPassed = paper.settings.passingMarks ? obtainedMarks >= paper.settings.passingMarks : true;
+      attempt.scoring.isPassed = paper.settings.passingMarks
+        ? obtainedMarks >= paper.settings.passingMarks
+        : true;
 
-      attempt.status = attempt.answers.every(a => a.isCorrect !== null) ? 'auto_graded' : 'submitted';
+      attempt.status = attempt.answers.every((a) => a.isCorrect !== null)
+        ? "auto_graded"
+        : "submitted";
       attempt.submitTime = new Date();
-      attempt.timeSpent = Math.round((attempt.submitTime - attempt.startTime) / 60000); // minutes
+      attempt.timeSpent = Math.round(
+        (attempt.submitTime - attempt.startTime) / 60000
+      ); // minutes
 
       await attempt.save();
 
       res.json({ success: true, attempt });
     } catch (error) {
-      console.error('Submit attempt error:', error);
-      res.status(400).json({ success: false, message: 'Error submitting attempt', error: error.message });
+      console.error("Submit attempt error:", error);
+      res
+        .status(400)
+        .json({
+          success: false,
+          message: "Error submitting attempt",
+          error: error.message,
+        });
     }
   }
 
   // Manual grading by teacher
+  // inside AttemptController class
   async gradeAttempt(req, res) {
     try {
       const { id } = req.params; // attemptId
       const { gradedAnswers } = req.body; // [{ questionId, marksObtained, feedback }]
 
       const attempt = await Attempt.findById(id);
-      if (!attempt) return res.status(404).json({ success: false, message: 'Attempt not found' });
+      if (!attempt) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Attempt not found" });
+      }
 
       // Update answers
-      gradedAnswers.forEach(ga => {
+      gradedAnswers.forEach((ga) => {
         const ans = attempt.answers.id(ga.questionId);
         if (ans) {
           ans.marksObtained = ga.marksObtained;
-          ans.feedback = ga.feedback || '';
+          ans.feedback = ga.feedback || "";
           ans.autoGraded = false;
           ans.gradedAt = new Date();
         }
       });
 
       // Update scoring
-      const obtainedMarks = attempt.answers.reduce((sum, a) => sum + (a.marksObtained || 0), 0);
+      const obtainedMarks = attempt.answers.reduce(
+        (sum, a) => sum + (a.marksObtained || 0),
+        0
+      );
       const totalMarks = attempt.scoring.totalMarks;
       const percentage = ((obtainedMarks / totalMarks) * 100).toFixed(2);
+
       attempt.scoring.obtainedMarks = obtainedMarks;
       attempt.scoring.percentage = Number(percentage);
       attempt.scoring.isPassed = attempt.scoring.percentage >= 50; // or custom passing logic
 
-      attempt.status = 'manually_graded';
+      attempt.status = "manually_graded";
       attempt.grading.gradedBy = req.user._id;
       attempt.grading.gradedAt = new Date();
       attempt.grading.isFullyGraded = true;
 
       await attempt.save();
 
-      res.json({ success: true, attempt });
+      // === Create or Update Result ===
+      const resultData = {
+        attemptId: attempt._id,
+        studentId: attempt.studentId,
+        paperId: attempt.paperId,
+        totalMarks,
+        obtainedMarks,
+        percentage: Number(percentage),
+        isPassed: attempt.scoring.isPassed,
+        feedback:
+          gradedAnswers
+            .map((ga) => ga.feedback)
+            .filter(Boolean)
+            .join("; ") || "",
+        metadata: {
+          gradedBy: req.user._id,
+          gradedAt: new Date(),
+          remarks: "Graded manually",
+        },
+      };
+
+      let result = await Result.findOne({ attemptId: attempt._id });
+      if (result) {
+        // update
+        Object.assign(result, resultData);
+        await result.save();
+      } else {
+        // create
+        result = await Result.create(resultData);
+      }
+
+      res.json({ success: true, attempt, result });
     } catch (error) {
-      console.error('Grade attempt error:', error);
-      res.status(400).json({ success: false, message: 'Error grading attempt', error: error.message });
+      console.error("Grade attempt error:", error);
+      res
+        .status(400)
+        .json({
+          success: false,
+          message: "Error grading attempt",
+          error: error.message,
+        });
     }
   }
 }

@@ -56,7 +56,7 @@ async login(req, res) {
       expiresIn: '1h',
     });
 
-    res.json({ token });
+    res.json({ token, role: user.role, test: "aoo aoo youlololo" });
   } catch (error) {
     console.error(error); // log actual error
     res.status(400).json({ message: 'Error logging in user' });
