@@ -116,7 +116,7 @@ class PaperController {
         return res.status(403).json({ success: false, message: 'Not authorized' });
       }
 
-      await paper.remove();
+      await Paper.findByIdAndDelete(id);
       res.json({ success: true, message: 'Paper deleted' });
     } catch (error) {
       res.status(400).json({ success: false, message: 'Error deleting paper', error: error.message });

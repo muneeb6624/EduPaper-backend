@@ -1,4 +1,3 @@
-// server/routes/routes.js
 const express = require('express');
 const router = express.Router();
 
@@ -20,55 +19,70 @@ router.post('/auth/register', authCtrl.register);
 router.post('/auth/refresh', authCtrl.refreshToken);
 
 /* -------------------------
-   USER ROUTES (Admin only)
+   USER PROFILE ROUTES (LOGGED IN USER)
 -------------------------- */
-router.get('/users', protect, authorize('admin'), UserController.getAllUsers);
-router.get('/users/:id', protect, authorize('admin'), UserController.getUserById);
-router.put('/users/:id', protect, authorize('admin'), UserController.updateUser);
-router.delete('/users/:id', protect, authorize('admin'), UserController.deleteUser);
+router.get('/me', protect, UserController.getProfile);
+router.put('/me', protect, UserController.updateProfile);
 
 /* -------------------------
-   PAPER ROUTES (Teacher only for create/update/delete)
+   USER ROUTES (Admin only)
+-------------------------- */
+// router.get('/users', protect, authorize(), UserController.getAllUsers);
+// router.get('/users/:id', protect, authorize(), UserController.getUserById);
+// router.put('/users/:id', protect, authorize(), UserController.updateUser);
+// router.delete('/users/:id', protect, authorize(), UserController.deleteUser);
+
+router.get('/users', protect, UserController.getAllUsers);
+router.get('/users/:id', protect, UserController.getUserById);
+router.put('/users/:id', protect, UserController.updateUser);
+router.delete('/users/:id', protect, UserController.deleteUser);
+
+
+/* -------------------------
+   PAPER ROUTES 
 -------------------------- */
 router.post('/papers', protect, authorize('teacher'), PaperController.createPaper);
 router.get('/papers', protect, PaperController.getPapers);
 router.get('/papers/:id', protect, PaperController.getPaperById);
 router.put('/papers/:id', protect, authorize('teacher'), PaperController.updatePaper);
 router.delete('/papers/:id', protect, authorize('teacher'), PaperController.deletePaper);
+router.post('/papers/:id/assign', protect, authorize('teacher'), PaperController.assignPaper);
 
 /* -------------------------
-   ATTEMPT ROUTES (Student for attempts, Teacher for grading)
+   ATTEMPT ROUTES 
 -------------------------- */
 router.get('/papers/:paperId/attempt', protect, authorize('student'), attemptCtrl.startAttempt);
 router.post('/papers/:paperId/submit', protect, authorize('student'), attemptCtrl.submitAttempt);
 router.put('/attempts/:id/grade', protect, authorize('teacher'), attemptCtrl.gradeAttempt);
+router.get('/papers/:paperId/attempts', protect, authorize('teacher'), attemptCtrl.getPaperAttempts);
+router.get('/students/:studentId/attempts', protect, attemptCtrl.getStudentAttempts);
+router.get('/attempts/:id', protect, attemptCtrl.getAttemptById);
 
 /* -------------------------
    RESULT ROUTES
 -------------------------- */
 router.get('/results/:id', protect, resultCtrl.getResultById);
-router.get('/results/student/:studentId', protect, authorize('student'), resultCtrl.getStudentResults);
+router.get('/results/student/:studentId', protect, resultCtrl.getStudentResults);
 router.get('/results/class/:paperId', protect, authorize('teacher'), resultCtrl.getClassResults);
-
-
-/* -------------------------
-   UPDATE PROFILE (LOGGED IN USER)
--------------------------- */
-// Profile routes (any logged-in user)
-router.get('/users/me', protect, UserController.getProfile);
-router.put('/users/me', protect, UserController.updateProfile);
-
+router.post('/results/:id/publish', protect, authorize('teacher'), resultCtrl.publishResult);
 
 /* -------------------------
    PING / API INFO
 -------------------------- */
-router.get('/ping', (req, res) => res.json({ message: 'pong' }));
+router.get('/ping', (req, res) => res.json({ 
+  success: true, 
+  message: 'pong',
+  timestamp: new Date().toISOString()
+}));
+
 router.get('/', (req, res) => {
   res.json({
+    success: true,
     message: 'EduPaper API v1.0.0',
     endpoints: {
       auth: '/api/auth',
       users: '/api/users',
+      profile: '/api/me',
       papers: '/api/papers',
       attempts: '/api/attempts',
       results: '/api/results'

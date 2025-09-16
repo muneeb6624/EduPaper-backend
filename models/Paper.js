@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const questionSchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['mcq', 'short', 'essay'],
+    enum: ['mcq', 'short_answer', 'long_answer'],
     required: [true, 'Question type is required']
   },
   question: {
@@ -28,8 +28,7 @@ const questionSchema = new mongoose.Schema({
   },
   order: {
     type: Number,
-    required: true,
-    min: 1
+     min: 1
   },
   explanation: {
     type: String,
@@ -62,7 +61,7 @@ const paperSchema = new mongoose.Schema({
   },
   questions: [questionSchema],
   settings: {
-    timeLimit: {
+    duration: {
       type: Number, // in minutes
       required: [true, 'Time limit is required'],
       min: [1, 'Minimum time limit is 1 minute'],
@@ -149,5 +148,36 @@ const paperSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
+// Pre-save middleware to calculate total marks
+paperSchema.pre('save', function(next) {
+  if (this.questions && this.questions.length > 0) {
+    const totalMarks = this.questions.reduce((sum, question) => sum + (question.marks || 0), 0);
+    if (!this.settings.totalMarks || this.settings.totalMarks === 0) {
+      this.settings.totalMarks = totalMarks;
+    }
+  }
+  
+  // Set passing marks to 50% if not specified
+  if (!this.settings.passingMarks) {
+    this.settings.passingMarks = Math.ceil(this.settings.totalMarks * 0.5);
+  }
+  
+  next();
+});
+
+// Validation for MCQ questions
+paperSchema.pre('save', function(next) {
+  for (let question of this.questions) {
+    if (question.type === 'mcq') {
+      if (!question.options || question.options.length < 2) {
+        return next(new Error('MCQ questions must have at least 2 options'));
+      }
+      if (!question.correctAnswer) {
+        return next(new Error('MCQ questions must have a correct answer'));
+      }
+    }
+  }
+  next();
+});
 
 module.exports = mongoose.model('Paper', paperSchema);

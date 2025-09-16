@@ -243,6 +243,73 @@ class AttemptController {
         });
     }
   }
+
+  // Get all attempts for a specific paper (teacher)
+  async getPaperAttempts(req, res) {
+    try {
+      const { paperId } = req.params;
+      
+      const attempts = await Attempt.find({ paperId })
+        .populate('studentId', 'name email')
+        .sort({ createdAt: -1 });
+
+      res.json({ success: true, attempts });
+    } catch (error) {
+      console.error("Get paper attempts error:", error);
+      res.status(400).json({
+        success: false,
+        message: "Error fetching paper attempts",
+        error: error.message,
+      });
+    }
+  }
+
+  // Get all attempts by a student
+  async getStudentAttempts(req, res) {
+    try {
+      const { studentId } = req.params;
+      
+      const attempts = await Attempt.find({ studentId })
+        .populate('paperId', 'title subject')
+        .sort({ createdAt: -1 });
+
+      res.json({ success: true, attempts });
+    } catch (error) {
+      console.error("Get student attempts error:", error);
+      res.status(400).json({
+        success: false,
+        message: "Error fetching student attempts",
+        error: error.message,
+      });
+    }
+  }
+
+  // Get specific attempt details
+  async getAttemptById(req, res) {
+    try {
+      const { id } = req.params;
+      
+      const attempt = await Attempt.findById(id)
+        .populate('studentId', 'name email')
+        .populate('paperId', 'title subject questions');
+
+      if (!attempt) {
+        return res.status(404).json({
+          success: false,
+          message: "Attempt not found",
+        });
+      }
+
+      res.json({ success: true, attempt });
+    } catch (error) {
+      console.error("Get attempt error:", error);
+      res.status(400).json({
+        success: false,
+        message: "Error fetching attempt",
+        error: error.message,
+      });
+    }
+  }
 }
 
 module.exports = new AttemptController();
