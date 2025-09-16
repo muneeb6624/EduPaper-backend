@@ -12,8 +12,10 @@ const routes = require('./routes/index');
 
 const app = express();
 
-// Connect to MongoDB
-connectDB();
+// Connect to MongoDB (with error handling)
+connectDB().catch(err => {
+  console.error('Failed to connect to MongoDB:', err);
+});
 
 // Rate limiting
 const limiter = rateLimit({
@@ -68,29 +70,25 @@ app.use(errorHandler);
 //   });
 // });
 
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err, promise) => {
-  console.log(`Unhandled Rejection: ${err.message}`);
-  // Close server & exit process
-  server.close(() => {
-    process.exit(1);
+// Handle unhandled promise rejections (only in development)
+if (process.env.NODE_ENV !== 'production') {
+  process.on('unhandledRejection', (err) => {
+    console.log(`Unhandled Rejection: ${err.message}`);
   });
-});
 
-// Handle uncaught exceptions
-process.on('uncaughtException', (err) => {
-  console.log(`Uncaught Exception: ${err.message}`);
-  console.log('Shutting down the server due to uncaught exception');
-  process.exit(1);
-});
+  process.on('uncaughtException', (err) => {
+    console.log(`Uncaught Exception: ${err.message}`);
+  });
 
-// Start server
-const PORT = process.env.PORT || 5000;
-const server = app.listen(PORT, () => {
-  console.log(`🚀 EduPaper Server is running on port ${PORT}`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-});
+  // Start server (only in development)
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`🚀 EduPaper Server is running on port ${PORT}`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  });
+}
 
+// Export the app for Vercel
 module.exports = app;
 
