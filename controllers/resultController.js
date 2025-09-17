@@ -26,14 +26,34 @@ class ResultController {
   async getStudentResults(req, res) {
     try {
       const { studentId } = req.params;
+      
+      console.log(`🔍 Fetching results for student: ${studentId}`);
+      
       const results = await Result.find({ studentId })
-        .populate('paperId', 'title subject')
+        .populate('paperId', 'title subject settings')
+        .populate('attemptId', 'timeSpent submitTime')
         .sort({ createdAt: -1 });
 
-      res.json(results);
+      console.log(`📊 Found ${results.length} results for student ${studentId}`);
+      console.log('🏆 Results:', results.map(r => ({
+        id: r._id,
+        paper: r.paperId?.title,
+        score: `${r.obtainedMarks}/${r.totalMarks}`,
+        percentage: r.percentage
+      })));
+
+      res.json({ 
+        success: true, 
+        results,
+        count: results.length 
+      });
     } catch (error) {
-      console.error(error);
-      res.status(400).json({ message: 'Error fetching student results' });
+      console.error('Get student results error:', error);
+      res.status(400).json({ 
+        success: false, 
+        message: 'Error fetching student results',
+        error: error.message 
+      });
     }
   }
 

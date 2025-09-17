@@ -7,7 +7,7 @@ const answerSchema = new mongoose.Schema({
   },
   questionType: {
     type: String,
-    enum: ['mcq', 'short', 'essay'],
+    enum: ['mcq', 'short_answer', 'long_answer'],
     required: true
   },
   answer: {
@@ -19,7 +19,7 @@ const answerSchema = new mongoose.Schema({
     type: Boolean,
     default: null // null for ungraded, true/false for graded
   },
-  marksObtained: {
+  obtainedMarks: {
     type: Number,
     default: 0,
     min: 0

@@ -4,10 +4,37 @@ const bcrypt = require('bcryptjs');
 class UserController {
   async getAllUsers(req, res) {
     try {
-      const users = await User.find({ isActive: true }).select('-password');
+      const { role, page = 1, limit = 50, search = '' } = req.query;
+      
+      // Build query
+      let query = { isActive: true };
+      
+      // Filter by role if provided
+      if (role) {
+        query.role = role;
+      }
+      
+      // Add search functionality
+      if (search) {
+        query.$or = [
+          { name: { $regex: search, $options: 'i' } },
+          { email: { $regex: search, $options: 'i' } }
+        ];
+      }
+      
+      const users = await User.find(query)
+        .select('-password')
+        .limit(limit * 1)
+        .skip((page - 1) * limit);
+      
+      const total = await User.countDocuments(query);
+      
       res.json({
         success: true,
         count: users.length,
+        total,
+        users: users, // Frontend expects 'users' key
+        students: users, // Also provide 'students' for compatibility
         data: users
       });
     } catch (error) {
@@ -15,6 +42,28 @@ class UserController {
       res.status(500).json({ 
         success: false, 
         message: 'Error getting all users',
+        error: error.message 
+      });
+    }
+  }
+
+  async getStudents(req, res) {
+    try {
+      const students = await User.find({ 
+        role: 'student', 
+        isActive: true 
+      }).select('-password');
+      
+      res.json({
+        success: true,
+        count: students.length,
+        students: students
+      });
+    } catch (error) {
+      console.error('Get students error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Error getting students',
         error: error.message 
       });
     }

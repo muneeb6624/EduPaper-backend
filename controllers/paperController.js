@@ -32,15 +32,45 @@ class PaperController {
   // Get all papers (teacher/admin sees all, student sees assigned)
   async getPapers(req, res) {
     try {
+      console.log(`📋 Getting papers for user: ${req.user._id}, role: ${req.user.role}`);
+      
       let papers;
       if (req.user.role === 'student') {
-        papers = await Paper.find({ assignedTo: req.user._id, isActive: true });
+        // For students: get papers assigned to them
+        papers = await Paper.find({ 
+          assignedTo: req.user._id, 
+          isActive: true 
+        }).populate('createdBy', 'name email');
+        
+        console.log(`👨‍🎓 Student found ${papers.length} assigned papers`);
+      } else if (req.user.role === 'teacher') {
+        // For teachers: get papers they created
+        papers = await Paper.find({ 
+          createdBy: req.user._id, 
+          isActive: true 
+        });
+        
+        console.log(`👨‍🏫 Teacher found ${papers.length} created papers`);
       } else {
-        papers = await Paper.find({ createdBy: req.user._id, isActive: true });
+        // For admin: get all papers
+        papers = await Paper.find({ isActive: true }).populate('createdBy', 'name email');
+        console.log(`👨‍💼 Admin found ${papers.length} total papers`);
       }
-      res.json({ success: true, papers });
+      
+      res.json({ 
+        success: true, 
+        papers,
+        count: papers.length,
+        userRole: req.user.role,
+        userId: req.user._id
+      });
     } catch (error) {
-      res.status(400).json({ success: false, message: 'Error fetching papers', error: error.message });
+      console.error('Error fetching papers:', error);
+      res.status(400).json({ 
+        success: false, 
+        message: 'Error fetching papers', 
+        error: error.message 
+      });
     }
   }
 
